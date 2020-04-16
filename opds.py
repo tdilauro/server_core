@@ -69,6 +69,16 @@ from util.opds_writer import (
     OPDSMessage,
 )
 
+class AvailableNowWorkUnavailable(Exception):
+    """Raise this exception when a Work cannot be immediately
+    fulfilled, even though a request was made for items that
+    are available now or always, to cancel the creation of
+    an <entry> for the Work.
+
+    This is likely to happen when the availability in search is
+    not in sync with the availability in the the database.
+    """
+
 class UnfulfillableWork(Exception):
     """Raise this exception when it turns out a Work currently cannot be
     fulfilled through any means, *and* this is a problem sufficient to
@@ -1197,6 +1207,16 @@ class AcquisitionFeed(OPDSFeed):
             return self._create_entry(
                 work, active_license_pool, active_edition, identifier,
                 force_create, use_cache
+            )
+        except AvailableNowWorkUnavailable, e:
+            logging.warning(
+                "Work %r is not available when '%s' facet specified as '%s'. Will not create <entry>.",
+                work, self.annotator.facets.AVAILABILITY_FACET_GROUP_NAME, self.annotator.facets.availability
+            )
+            return self.error_message(
+                identifier,
+                403,
+                "Work is unavailable, but request is for available works only."
             )
         except UnfulfillableWork, e:
             logging.info(
